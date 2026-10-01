@@ -1,23 +1,27 @@
 'use strict';
 const $=id=>document.getElementById(id),cv=(w,h)=>Object.assign(document.createElement('canvas'),{width:w,height:h});
 let base=cv(1,1),original=cv(1,1);const screen=$('image'),svg=$('boxes');
-const S={loaded:false,busy:false,lines:[],r:null,source:null,a:null,match:null,preview:null,history:[],mode:'click',worker:null,lang:null,serial:0};
+const S={loaded:false,busy:false,lines:[],r:null,source:null,a:null,match:null,preview:null,history:[],mode:'click',worker:null,lang:null,serial:0,detectedLang:null};
+const LANG_LABELS={auto:'自动识别语种','eng+chi_sim':'简体中文 + 英文','eng+chi_tra':'繁体中文 + 英文','eng':'英文 / 数字','eng+jpn':'日文 + 英文','eng+kor':'韩文 + 英文','eng+spa':'西班牙语 + 英文','eng+por':'葡萄牙语 + 英文','eng+fra':'法语 + 英文','eng+deu':'德语 + 英文','eng+ita':'意大利语 + 英文','eng+vie':'越南语 + 英文','eng+rus':'俄语 + 英文','eng+tha':'泰语 + 英文'};
+const AUTO_LANGS=['eng+chi_sim','eng+chi_tra','eng+jpn','eng+kor','eng','eng+spa','eng+por','eng+rus','eng+tha'];
+function langLabel(code){return LANG_LABELS[code]||code;}
 function addFont(value,name=value){if(![...$('font').options].some(o=>o.value===value))$('font').add(new Option(name,value));}
 ['Microsoft YaHei','Microsoft JhengHei','SimSun','SimHei','DengXian','KaiTi','FangSong','Arial','Arial Black','Verdana','Tahoma','Helvetica','Times New Roman','Georgia','Courier New','Trebuchet MS','sans-serif','serif','monospace'].forEach(f=>addFont(f));
 function msg(text,error=false){$('status').textContent=text;$('status').classList.toggle('error',error);}
 function lock(v){S.busy=v;document.querySelectorAll('button').forEach(b=>b.disabled=v);$('controls').disabled=v||!S.source;for(const id of ['detect','select','export','original','clickmode'])$(id).disabled=v||!S.loaded;$('undo').disabled=v||!S.history.length;}
 async function run(fn){if(S.busy)return;lock(true);try{await fn();}catch(e){msg(e.message,true);}finally{lock(false);}}
 function updateCompare(){
- const a=$('originalView'),b=$('previewView'); if(!a||!b||!S.loaded)return;
+ const a=$('originalView');
+ if(!a||!S.loaded)return;
  a.width=original.width;a.height=original.height;
- b.width=base.width;b.height=base.height;
- a.getContext('2d').drawImage(original,0,0);
- b.getContext('2d').clearRect(0,0,b.width,b.height);
- b.getContext('2d').drawImage(base,0,0);
- if(S.preview)b.getContext('2d').drawImage(S.preview.patch,S.preview.r.x,S.preview.r.y);
+ const ctx=a.getContext('2d');
+ ctx.clearRect(0,0,a.width,a.height);
+ ctx.drawImage(original,0,0);
+ $('originalMeta').textContent=`${original.width} × ${original.height}`;
+ $('previewMeta').textContent=S.preview?'实时预览已更新':`${base.width} × ${base.height}`;
 }
 function paint(compare=false){if(!S.loaded)return;const c=screen.getContext('2d');c.clearRect(0,0,screen.width,screen.height);c.drawImage(compare?original:base,0,0);if(S.preview&&!compare)c.drawImage(S.preview.patch,S.preview.r.x,S.preview.r.y);boxes();updateCompare();}
-function resize(){if(!S.loaded)return;const v=$('viewport'),z=$('zoom').value==='fit'?Math.max(.02,Math.min((v.clientWidth-60)/base.width,(v.clientHeight-60)/base.height,1)):Number($('zoom').value);$('stage').style.width=base.width*z+'px';$('stage').style.height=base.height*z+'px';}
+function resize(){if(!S.loaded)return;const v=$('viewport');const gap=24;const fitW=Math.max(220,(v.clientWidth-90-gap)/2);const fitH=Math.max(220,v.clientHeight-90);const z=$('zoom').value==='fit'?Math.max(.02,Math.min(fitW/base.width,fitH/base.height,1)):Number($('zoom').value);for(const id of ['originalPane','previewPane']){const el=$(id);if(el){el.style.width=base.width*z+'px';el.style.height=base.height*z+'px';}}$('compareStage').style.minWidth=(base.width*z*2+gap)+'px';}
 function rect(r){const a={x:Math.max(0,Math.floor(r.x)),y:Math.max(0,Math.floor(r.y)),w:Math.round(r.w),h:Math.round(r.h)};a.w=Math.min(a.w,base.width-a.x);a.h=Math.min(a.h,base.height-a.y);if(!Object.values(a).every(Number.isFinite)||a.w<3||a.h<3)throw Error('请选择至少 3 × 3 像素的区域');return a;}
 function boxes(){svg.replaceChildren();function box(r,cls,fn){const p=document.createElementNS(svg.namespaceURI,'rect');for(const [k,v] of Object.entries({x:r.x,y:r.y,width:r.w,height:r.h}))p.setAttribute(k,v);p.classList.add(cls);if(fn)p.onpointerdown=fn;svg.append(p);}S.lines.forEach(line=>box(line.r,'text-box',e=>{if(S.mode==='click'&&!S.busy){e.stopPropagation();run(()=>choose(line));}}));if(S.r){const n=S.nudge||{x:0,y:0},r={...S.r,x:S.r.x+n.x,y:S.r.y+n.y};box(r,'selection');if(S.source&&S.mode==='click')box(r,'move-hit',beginTextDrag);}}
 function list(){const root=$('blocks');root.replaceChildren();S.lines.forEach(line=>{const b=document.createElement('button');b.className='block';b.textContent=line.text;const s=document.createElement('small');s.textContent=`OCR ${Math.round(line.confidence||0)} / 100 · 点击编辑`;b.append(s);b.onclick=()=>run(()=>choose(line));root.append(b);});if(!S.lines.length)root.textContent='识别后可直接点击文字行；也可框选一行自动识别。';}
@@ -25,11 +29,13 @@ async function load(file){
  if(!file)return;if(file.size>25*1024*1024)throw Error('图片上限 25 MB');
  const url=URL.createObjectURL(file);try{const im=await decodeImage(url);if(im.width*im.height>16000000)throw Error('图片上限 1600 万像素');
  const image=cv(im.width,im.height);image.getContext('2d').drawImage(im,0,0);attachDocument(image,file.name||'未命名图片');
- try{await detect();}catch(e){msg('图片已打开。'+e.message+'；可使用手动文字层或在线 Photopea。',true);}
+ $('langhint').textContent='默认会智能识别语种；识别不准时可手动切换后重新识别。';try{await detect();}catch(e){msg('图片已打开。'+e.message+'；可使用添加文字或在线 Photopea。',true);}
  }finally{URL.revokeObjectURL(url);}
 }
 function script(src){return new Promise((ok,no)=>{const s=document.createElement('script');s.src=src;s.onload=ok;s.onerror=()=>{s.remove();no(Error('OCR 引擎下载失败，请联网重试或运行install-assets.ps1'));};document.head.append(s);});}
-async function worker(){const lang=$('language').value;if(S.worker&&S.lang===lang)return S.worker;if(S.worker){await S.worker.terminate();S.worker=null;}if(!window.Tesseract){try{await script('vendor/tesseract.min.js');}catch{await script('https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js');}}let local=false;try{const r=await fetch('vendor/ready.json');local=r.ok&&(await r.json()).ready===true;}catch{}const options={logger:m=>msg(`本地 OCR · ${m.status} ${Math.round((m.progress||0)*100)}%`)};if(local)Object.assign(options,{workerPath:'vendor/worker.min.js',corePath:'vendor/core',langPath:'vendor/lang'});try{S.worker=await Tesseract.createWorker(lang,1,options);S.lang=lang;return S.worker;}catch(e){throw Error('OCR 初始化失败，需要首次下载免费引擎与模型。'+e.message);}}
+function downsampleCanvas(source,maxEdge=1280){const scale=Math.min(1,maxEdge/Math.max(source.width,source.height));if(scale===1)return source;const c=cv(Math.max(1,Math.round(source.width*scale)),Math.max(1,Math.round(source.height*scale)));c.getContext('2d').drawImage(source,0,0,c.width,c.height);return c;}
+async function worker(langOverride){const lang=langOverride||S.detectedLang||($('language').value==='auto'?'eng':$('language').value);if(S.worker&&S.lang===lang)return S.worker;if(S.worker){await S.worker.terminate();S.worker=null;}if(!window.Tesseract){try{await script('vendor/tesseract.min.js');}catch{await script('https://cdn.jsdelivr.net/npm/tesseract.js@6.0.1/dist/tesseract.min.js');}}let local=false;try{const r=await fetch('vendor/ready.json');local=r.ok&&(await r.json()).ready===true;}catch{}const options={logger:m=>msg(`本地 OCR · ${m.status} ${Math.round((m.progress||0)*100)}%`)};if(local)Object.assign(options,{workerPath:'vendor/worker.min.js',corePath:'vendor/core',langPath:'vendor/lang'});try{S.worker=await Tesseract.createWorker(lang,1,options);S.lang=lang;return S.worker;}catch(e){throw Error('OCR 初始化失败，需要首次下载免费引擎与模型。'+e.message);}}
+async function pickLanguage(sourceCanvas){const selected=$('language').value;if(selected!=='auto'){S.detectedLang=selected;$('langhint').textContent=`当前语言：${langLabel(selected)}。如识别不准，可切换后重新识别。`;return selected;}const sample=downsampleCanvas(sourceCanvas,960);let best={lang:'eng',score:-1};msg('正在智能识别语种…');for(const lang of AUTO_LANGS){const w=await worker(lang);await w.setParameters({tessedit_pageseg_mode:'11',preserve_interword_spaces:'1'});const {data}=await w.recognize(sample,{}, {blocks:true});const text=(data.text||'').trim();const useful=text.replace(/\s/g,'').length;const nonLatin=(text.match(/[^\u0000-\u00ff]/g)||[]).length;const confidence=Number(data.confidence)||0;const score=useful*2+nonLatin*1.4+confidence/8;if(score>best.score)best={lang,score};}S.detectedLang=best.lang;$('langhint').textContent=`已智能识别：${langLabel(best.lang)}。如不准确，可手动切换语言后重新识别。`;msg(`已智能识别语种：${langLabel(best.lang)}。如不准确，可手动切换语言后重新识别。`);return best.lang;}
 function parse(data,offset={x:0,y:0},scale=1){
  const lines=[];let group=0;
  for(const block of data.blocks||[])for(const para of block.paragraphs||[]){const members=[];
@@ -39,15 +45,15 @@ function parse(data,offset={x:0,y:0},scale=1){
  const gaps=members.slice(1).map((line,i)=>line.rawY-members[i].rawY).filter(v=>v>0);const leading=gaps.length?median(gaps):0;for(const line of members)line.leading=leading||Math.max(12,line.rawHeight*1.35);group++;
  }return lines;
 }
-async function detect(){const w=await worker();await w.setParameters({tessedit_pageseg_mode:'11',preserve_interword_spaces:'1'});const {data}=await w.recognize(base,{}, {blocks:true});S.lines=parse(data);list();paint();msg(S.lines.length?`识别到 ${S.lines.length} 行，点击文字或框选即可修改。`:'未识别到文字，请框选一行重试，或切换识别语言。',!S.lines.length);}
+async function detect(){const lang=await pickLanguage(base);const w=await worker(lang);await w.setParameters({tessedit_pageseg_mode:'11',preserve_interword_spaces:'1'});const {data}=await w.recognize(base,{}, {blocks:true});S.lines=parse(data);list();paint();msg(S.lines.length?`识别到 ${S.lines.length} 行，当前语种：${langLabel(lang)}。点击文字或框选即可修改。`:'未识别到文字，请框选一行重试，或切换识别语言。',!S.lines.length);}
 async function recognize(r){
  Object.assign(S,{r,source:null,a:null,match:null,preview:null});$('old').value=$('text').value='';paint();
  const scale=Math.min(3,Math.max(1,80/r.h)),c=cv(Math.round(r.w*scale),Math.round(r.h*scale));c.getContext('2d').drawImage(base,r.x,r.y,r.w,r.h,0,0,c.width,c.height);
- const w=await worker();await w.setParameters({tessedit_pageseg_mode:$('ocrmode').value,preserve_interword_spaces:'1'});const {data}=await w.recognize(c,{}, {blocks:true});const lines=parse(data,r,scale);
- if(!lines.length)throw Error('未识别到文字。可重新框选，或点手动文字层 / 在线 Photopea 修改。');
+ const lang=await pickLanguage(c);const w=await worker(lang);await w.setParameters({tessedit_pageseg_mode:$('ocrmode').value,preserve_interword_spaces:'1'});const {data}=await w.recognize(c,{}, {blocks:true});const lines=parse(data,r,scale);
+ if(!lines.length)throw Error('未识别到文字。可重新框选，或点添加文字 / 在线 Photopea 修改。');
  if(lines.length===1){lines[0].r=r;await choose(lines[0]);}else{const gaps=lines.slice(1).map((l,i)=>l.rawY-lines[i].rawY).filter(n=>n>0);await choose({text:lines.map(l=>l.text).join('\n'),r,confidence:lines.reduce((n,l)=>n+l.confidence,0)/lines.length,symbols:lines.flatMap(l=>l.symbols),lines,leading:gaps.length?median(gaps):lines[0].leading,rawHeight:median(lines.map(l=>l.rawHeight))});}
 }
-async function choose(line){S.r={...line.r};S.source=line;S.nudge={x:0,y:0};S.cleanCache=null;showNudge();S.preview=null;S.match=null;$('old').value=$('text').value=line.text;for(const k of ['x','y','w','h'])$(k).value=S.r[k];$('leading').value=(line.leading||Math.max(12,line.r.h*1.2)).toFixed(2);$('angle').value=0;$('stroke').value=0;$('blur').value=0;$('opacity').value=1;try{S.a=analyze(S.r);}catch(e){S.source=null;throw Error(e.message+'；可使用手动文字层或在线 Photopea。');}$('color').value=S.a.fg;$('bgcolor').value=S.a.bg;await match();paint();msg(`原文已自动填入：${line.text}。只需输入替换内容。`);}
+async function choose(line){S.r={...line.r};S.source=line;S.nudge={x:0,y:0};S.cleanCache=null;showNudge();S.preview=null;S.match=null;$('old').value=$('text').value=line.text;for(const k of ['x','y','w','h'])$(k).value=S.r[k];$('leading').value=(line.leading||Math.max(12,line.r.h*1.2)).toFixed(2);$('angle').value=0;$('stroke').value=0;$('blur').value=0;$('opacity').value=1;try{S.a=analyze(S.r);}catch(e){S.source=null;throw Error(e.message+'；可使用添加文字或在线 Photopea。');}$('color').value=S.a.fg;$('bgcolor').value=S.a.bg;await match();paint();msg(`原文已自动填入：${line.text}。只需输入替换内容。`);}
 function point(e){const b=svg.getBoundingClientRect();return {x:(e.clientX-b.left)/b.width*base.width,y:(e.clientY-b.top)/b.height*base.height};}
 svg.onpointerdown=e=>{if(!S.loaded||S.busy||S.mode!=='box')return;e.preventDefault();svg.setPointerCapture(e.pointerId);const a=point(e);Object.assign(S,{source:null,match:null,preview:null});const move=e=>{const b=point(e);S.r={x:Math.min(a.x,b.x),y:Math.min(a.y,b.y),w:Math.abs(a.x-b.x),h:Math.abs(a.y-b.y)};boxes();};const clean=()=>{svg.removeEventListener('pointermove',move);svg.removeEventListener('pointerup',end);svg.removeEventListener('pointercancel',cancel);};const end=()=>{clean();try{const r=rect(S.r);run(()=>recognize(r));}catch(e){S.r=null;paint();msg(e.message,true);}};const cancel=()=>{clean();S.r=null;paint();};svg.addEventListener('pointermove',move);svg.addEventListener('pointerup',end);svg.addEventListener('pointercancel',cancel);};
 function mode(m){S.mode=m;document.body.classList.toggle('manual',m==='box');$('select').classList.toggle('primary',m==='box');$('clickmode').classList.toggle('primary',m==='click');msg(m==='box'?'拖动框选一行，松开后自动识别原文。':'点击图片上的文字框，自动带入原文与样式。');}
@@ -89,6 +95,7 @@ async function apply(){const v=await generate();S.history.push({r:{...v.r},data:
 function clearSelection(){Object.assign(S,{lines:[],source:null,r:null,a:null,match:null,preview:null});list();paint();}
 $('upload').onclick=$('start').onclick=()=>$('file').click();$('file').onchange=()=>{const f=$('file').files[0];$('file').value='';run(()=>load(f));};$('detect').onclick=()=>run(detect);$('select').onclick=()=>mode('box');$('clickmode').onclick=()=>mode('click');$('estimate').onclick=()=>run(match);async function livePreview(){if(!S.source||S.busy)return;try{S.preview=await generate();paint();}catch(e){}}
 $('preview').onclick=()=>run(async()=>{await livePreview();msg('实时预览已生成，修改参数会自动同步。');});
+$('language').addEventListener('change',()=>{S.detectedLang=$('language').value==='auto'?null:$('language').value;$('langhint').textContent=$('language').value==='auto'?'默认会智能识别语种；识别不准时可手动切换后重新识别。':`当前语言：${langLabel($('language').value)}。切换后请重新识别图片或选区。`;});
 ['text','font','size','weight','spacing','leading','stroke','blur','angle','opacity','color','bgcolor','dx','dy'].forEach(id=>{
  const el=$(id); if(el) el.addEventListener('input',()=>{clearTimeout(window.__pv);window.__pv=setTimeout(livePreview,180);});
 });$('form').onsubmit=e=>{e.preventDefault();run(apply);};
@@ -99,9 +106,11 @@ $('addfont').onclick=()=>$('fontfile').click();$('fontfile').onchange=()=>{const
 $('onlinefonts').onclick=()=>run(async()=>{let ok=0;for(const [id,path] of [['Noto Sans SC','notosanssc/NotoSansSC'],['Noto Serif SC','notoserifsc/NotoSerifSC']]){try{const face=new FontFace(id,`url("https://raw.githubusercontent.com/google/fonts/main/ofl/${path}%5Bwght%5D.ttf")`,{weight:'100 900'});await face.load();document.fonts.add(face);addFont(id);ok++;}catch{}}if(!ok)throw Error('免费字体下载失败，请读取本机字体或批量导入');msg(`已加载 ${ok} 个免费中文字体系列，点击重新匹配。`);});
 for(const id of ['text','font','size','weight','spacing','leading','color','stroke','blur','angle','opacity','repair','bgcolor','dx','dy','render'])$(id).addEventListener('input',()=>{S.preview=null;paint();try{comparison();}catch{}});
 $('recognizebox').onclick=()=>run(()=>recognize(rect(Object.fromEntries(['x','y','w','h'].map(k=>[k,+$(k).value])))));
+function beginViewportPan(e){if(!S.loaded||e.button!==0)return;const target=e.target;const interactive=target.closest?.('button,input,select,textarea,label,summary,details');const isSvgTarget=target instanceof SVGElement;const blocked=target.classList?.contains('text-box')||target.classList?.contains('move-hit')||target.classList?.contains('selection');if(interactive||blocked||(S.mode==='box'&&isSvgTarget))return;const view=$('viewport'),startX=e.clientX,startY=e.clientY,ox=view.scrollLeft,oy=view.scrollTop;view.classList.add('dragging');const move=ev=>{view.scrollLeft=ox-(ev.clientX-startX);view.scrollTop=oy-(ev.clientY-startY);};const end=()=>{view.classList.remove('dragging');window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',end);window.removeEventListener('pointercancel',end);};window.addEventListener('pointermove',move);window.addEventListener('pointerup',end);window.addEventListener('pointercancel',end);}
+$('viewport').addEventListener('pointerdown',beginViewportPan,{passive:true});
 $('viewport').addEventListener('dragover',e=>e.preventDefault());$('viewport').addEventListener('drop',e=>{e.preventDefault();run(()=>load(e.dataTransfer.files[0]));});window.addEventListener('paste',e=>{if($('psdialog').open||$('newdialog').open)return;if(/INPUT|TEXTAREA/.test(document.activeElement.tagName))return;const f=[...e.clipboardData.items].find(i=>i.type.startsWith('image/'))?.getAsFile();if(f){e.preventDefault();run(()=>load(f));}});
 $('demo').onclick=()=>{const c=cv(1000,600),x=c.getContext('2d');x.fillStyle='#f3f0e9';x.fillRect(0,0,1000,600);x.fillStyle='#263b36';x.font='48px Arial';x.fillText('LOCAL TEXT STUDIO',100,220);x.font='30px Arial';x.fillText('2026 / CREATE SOMETHING NEW',100,310);c.toBlob(b=>run(()=>load(new File([b],'demo.png',{type:'image/png'}))));};
-window.addEventListener('pagehide',()=>{if(S.worker)S.worker.terminate();});lock(false);
+window.addEventListener('pagehide',()=>{if(S.worker)S.worker.terminate();});$('langhint').textContent='默认会智能识别语种；识别不准时可手动切换后重新识别。';lock(false);
 
 const availability=new Map();
 async function available(font){if(typeof FontResources!=='undefined'&&FontResources.has(font)){await document.fonts.load('24px "'+font+'"',(S.source?.text||'Aa').replace(/\n/g,' '));return true;}if(/^(Local|Import)/.test(font)||['sans-serif','serif','monospace'].includes(font)||document.fonts.check('16px "'+font+'"')&&font.startsWith('Noto'))return true;if(availability.has(font))return availability.get(font);let ok=false;try{await new FontFace('Check'+(++S.serial),'local("'+font.replace(/["\\]/g,'')+'")').load();ok=true;}catch{}availability.set(font,ok);return ok;}

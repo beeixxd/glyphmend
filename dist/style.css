@@ -7,3 +7,17 @@
 
 .compare-grid canvas{width:100%;max-height:220px;background:#090909;object-fit:contain;border:1px solid var(--border)}
 
+
+
+#stage{margin:auto;max-width:none}
+#compareStage{display:flex;gap:24px;align-items:flex-start;width:max-content;min-width:100%}
+.view-panel{display:flex;flex-direction:column;gap:10px;min-width:0}
+.view-head{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:var(--muted);padding:0 2px}
+.view-head strong{font-size:12px;color:var(--text)}
+.canvas-pane{position:relative;background:#0d0e13;border:1px solid var(--border);box-shadow:0 20px 80px #0007;overflow:hidden;flex:none}
+#originalPane,#previewPane{touch-action:none}
+#originalView,#image{display:block;width:100%;height:100%}
+#previewPane #boxes{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+#viewport.dragging{cursor:grabbing}
+#viewport.dragging *{cursor:grabbing!important;user-select:none}
+@media(max-width:1100px){#compareStage{flex-direction:column;min-width:auto;width:100%}.view-panel{width:max-content;max-width:100%}}
