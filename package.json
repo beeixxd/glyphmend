@@ -1,0 +1,1 @@
+{"name":"text-studio-free-web","version":"5.1.0","private":true,"scripts":{"start":"node server.cjs","test":"node test-all.cjs && node test-v51.cjs","test:browser":"node test-v51-browser.cjs"},"devDependencies":{"playwright":"^1.56.0"}}
