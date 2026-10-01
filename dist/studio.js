@@ -1,6 +1,6 @@
 'use strict';
 const $=id=>document.getElementById(id),cv=(w,h)=>Object.assign(document.createElement('canvas'),{width:w,height:h});
-let base=cv(1,1),original=cv(1,1);const screen=$('image'),svg=$('boxes');
+let base=cv(1,1),original=cv(1,1);const screen=$('image'),svg=$('boxes'),originalCanvas=$('originalView'),inlineEditor=$('inlineEditor');
 const S={loaded:false,busy:false,lines:[],r:null,source:null,a:null,match:null,preview:null,history:[],mode:'click',worker:null,lang:null,serial:0,detectedLang:null};
 const LANG_LABELS={auto:'自动识别语种','eng+chi_sim':'简体中文 + 英文','eng+chi_tra':'繁体中文 + 英文','eng':'英文 / 数字','eng+jpn':'日文 + 英文','eng+kor':'韩文 + 英文','eng+spa':'西班牙语 + 英文','eng+por':'葡萄牙语 + 英文','eng+fra':'法语 + 英文','eng+deu':'德语 + 英文','eng+ita':'意大利语 + 英文','eng+vie':'越南语 + 英文','eng+rus':'俄语 + 英文','eng+tha':'泰语 + 英文'};
 const AUTO_LANGS=['eng+chi_sim','eng+chi_tra','eng+jpn','eng+kor','eng','eng+spa','eng+por','eng+rus','eng+tha'];
@@ -10,18 +10,36 @@ function addFont(value,name=value){if(![...$('font').options].some(o=>o.value===
 function msg(text,error=false){$('status').textContent=text;$('status').classList.toggle('error',error);}
 function lock(v){S.busy=v;document.querySelectorAll('button').forEach(b=>b.disabled=v);$('controls').disabled=v||!S.source;for(const id of ['detect','select','export','original','clickmode'])$(id).disabled=v||!S.loaded;$('undo').disabled=v||!S.history.length;}
 async function run(fn){if(S.busy)return;lock(true);try{await fn();}catch(e){msg(e.message,true);}finally{lock(false);}}
-function updateCompare(){
- const a=$('originalView');
- if(!a||!S.loaded)return;
- a.width=original.width;a.height=original.height;
- const ctx=a.getContext('2d');
- ctx.clearRect(0,0,a.width,a.height);
- ctx.drawImage(original,0,0);
+function currentZoom(){if(!S.loaded)return 1;const v=$('viewport');const gap=24;return $('zoom').value==='fit'?Math.max(.02,Math.min(Math.max(220,(v.clientWidth-90-gap)/2)/base.width,Math.max(220,v.clientHeight-90)/base.height,1)):Number($('zoom').value);} 
+function updateCompare(compare=false){
+ if(!S.loaded)return;
+ originalCanvas.width=original.width;originalCanvas.height=original.height;
+ screen.width=base.width;screen.height=base.height;
+ const octx=originalCanvas.getContext('2d');
+ octx.clearRect(0,0,originalCanvas.width,originalCanvas.height);
+ octx.drawImage(original,0,0);
+ const pctx=screen.getContext('2d');
+ pctx.clearRect(0,0,screen.width,screen.height);
+ pctx.drawImage(compare?original:base,0,0);
+ if(S.preview&&!compare)pctx.drawImage(S.preview.patch,S.preview.r.x,S.preview.r.y);
  $('originalMeta').textContent=`${original.width} × ${original.height}`;
  $('previewMeta').textContent=S.preview?'实时预览已更新':`${base.width} × ${base.height}`;
 }
-function paint(compare=false){if(!S.loaded)return;const c=screen.getContext('2d');c.clearRect(0,0,screen.width,screen.height);c.drawImage(compare?original:base,0,0);if(S.preview&&!compare)c.drawImage(S.preview.patch,S.preview.r.x,S.preview.r.y);boxes();updateCompare();}
-function resize(){if(!S.loaded)return;const v=$('viewport');const gap=24;const fitW=Math.max(220,(v.clientWidth-90-gap)/2);const fitH=Math.max(220,v.clientHeight-90);const z=$('zoom').value==='fit'?Math.max(.02,Math.min(fitW/base.width,fitH/base.height,1)):Number($('zoom').value);for(const id of ['originalPane','previewPane']){const el=$(id);if(el){el.style.width=base.width*z+'px';el.style.height=base.height*z+'px';}}$('compareStage').style.minWidth=(base.width*z*2+gap)+'px';}
+function updateInlineEditor(){
+ if(!S.loaded||!S.source||!S.r){inlineEditor.hidden=true;return;}
+ const z=currentZoom(),n=S.nudge||{x:0,y:0},x=(S.r.x+n.x)*z,y=(S.r.y+n.y)*z,w=Math.max(24,S.r.w*z),h=Math.max(24,S.r.h*z);
+ inlineEditor.hidden=false;
+ inlineEditor.style.left=x+'px';inlineEditor.style.top=y+'px';inlineEditor.style.width=w+'px';inlineEditor.style.height=h+'px';
+ inlineEditor.style.fontFamily=`${$('font').value||'sans-serif'}`;
+ inlineEditor.style.fontSize=(Math.max(10,(Number($('size').value)||16)*z))+'px';
+ inlineEditor.style.fontWeight=$('weight').value||'400';
+ inlineEditor.style.lineHeight=Math.max(1,((Number($('leading').value)||20)/(Number($('size').value)||16))).toFixed(2);
+ inlineEditor.style.letterSpacing=((Number($('spacing').value)||0)*z)+'px';
+ inlineEditor.style.color=$('color').value||'#f3f1ff';
+ inlineEditor.value=$('text').value;
+ }
+function paint(compare=false){if(!S.loaded)return;updateCompare(compare);boxes();updateInlineEditor();}
+function resize(){if(!S.loaded)return;const z=currentZoom();for(const id of ['originalPane','previewPane']){const el=$(id);if(el){el.style.width=base.width*z+'px';el.style.height=base.height*z+'px';}}$('compareStage').style.minWidth=(base.width*z*2+24)+'px';updateInlineEditor();}
 function rect(r){const a={x:Math.max(0,Math.floor(r.x)),y:Math.max(0,Math.floor(r.y)),w:Math.round(r.w),h:Math.round(r.h)};a.w=Math.min(a.w,base.width-a.x);a.h=Math.min(a.h,base.height-a.y);if(!Object.values(a).every(Number.isFinite)||a.w<3||a.h<3)throw Error('请选择至少 3 × 3 像素的区域');return a;}
 function boxes(){svg.replaceChildren();function box(r,cls,fn){const p=document.createElementNS(svg.namespaceURI,'rect');for(const [k,v] of Object.entries({x:r.x,y:r.y,width:r.w,height:r.h}))p.setAttribute(k,v);p.classList.add(cls);if(fn)p.onpointerdown=fn;svg.append(p);}S.lines.forEach(line=>box(line.r,'text-box',e=>{if(S.mode==='click'&&!S.busy){e.stopPropagation();run(()=>choose(line));}}));if(S.r){const n=S.nudge||{x:0,y:0},r={...S.r,x:S.r.x+n.x,y:S.r.y+n.y};box(r,'selection');if(S.source&&S.mode==='click')box(r,'move-hit',beginTextDrag);}}
 function list(){const root=$('blocks');root.replaceChildren();S.lines.forEach(line=>{const b=document.createElement('button');b.className='block';b.textContent=line.text;const s=document.createElement('small');s.textContent=`OCR ${Math.round(line.confidence||0)} / 100 · 点击编辑`;b.append(s);b.onclick=()=>run(()=>choose(line));root.append(b);});if(!S.lines.length)root.textContent='识别后可直接点击文字行；也可框选一行自动识别。';}
@@ -53,7 +71,7 @@ async function recognize(r){
  if(!lines.length)throw Error('未识别到文字。可重新框选，或点添加文字 / 在线 Photopea 修改。');
  if(lines.length===1){lines[0].r=r;await choose(lines[0]);}else{const gaps=lines.slice(1).map((l,i)=>l.rawY-lines[i].rawY).filter(n=>n>0);await choose({text:lines.map(l=>l.text).join('\n'),r,confidence:lines.reduce((n,l)=>n+l.confidence,0)/lines.length,symbols:lines.flatMap(l=>l.symbols),lines,leading:gaps.length?median(gaps):lines[0].leading,rawHeight:median(lines.map(l=>l.rawHeight))});}
 }
-async function choose(line){S.r={...line.r};S.source=line;S.nudge={x:0,y:0};S.cleanCache=null;showNudge();S.preview=null;S.match=null;$('old').value=$('text').value=line.text;for(const k of ['x','y','w','h'])$(k).value=S.r[k];$('leading').value=(line.leading||Math.max(12,line.r.h*1.2)).toFixed(2);$('angle').value=0;$('stroke').value=0;$('blur').value=0;$('opacity').value=1;try{S.a=analyze(S.r);}catch(e){S.source=null;throw Error(e.message+'；可使用添加文字或在线 Photopea。');}$('color').value=S.a.fg;$('bgcolor').value=S.a.bg;await match();paint();msg(`原文已自动填入：${line.text}。只需输入替换内容。`);}
+async function choose(line){S.r={...line.r};S.source=line;S.nudge={x:0,y:0};S.cleanCache=null;showNudge();S.preview=null;S.match=null;$('old').value=$('text').value=line.text;for(const k of ['x','y','w','h'])$(k).value=S.r[k];$('leading').value=(line.leading||Math.max(12,line.r.h*1.2)).toFixed(2);$('angle').value=0;$('stroke').value=0;$('blur').value=0;$('opacity').value=1;try{S.a=analyze(S.r);}catch(e){S.source=null;throw Error(e.message+'；可使用添加文字或在线 Photopea。');}$('color').value=S.a.fg;$('bgcolor').value=S.a.bg;await match();paint();syncInlineEditorFromForm();msg(`原文已自动填入：${line.text}。只需输入替换内容。`);}
 function point(e){const b=svg.getBoundingClientRect();return {x:(e.clientX-b.left)/b.width*base.width,y:(e.clientY-b.top)/b.height*base.height};}
 svg.onpointerdown=e=>{if(!S.loaded||S.busy||S.mode!=='box')return;e.preventDefault();svg.setPointerCapture(e.pointerId);const a=point(e);Object.assign(S,{source:null,match:null,preview:null});const move=e=>{const b=point(e);S.r={x:Math.min(a.x,b.x),y:Math.min(a.y,b.y),w:Math.abs(a.x-b.x),h:Math.abs(a.y-b.y)};boxes();};const clean=()=>{svg.removeEventListener('pointermove',move);svg.removeEventListener('pointerup',end);svg.removeEventListener('pointercancel',cancel);};const end=()=>{clean();try{const r=rect(S.r);run(()=>recognize(r));}catch(e){S.r=null;paint();msg(e.message,true);}};const cancel=()=>{clean();S.r=null;paint();};svg.addEventListener('pointermove',move);svg.addEventListener('pointerup',end);svg.addEventListener('pointercancel',cancel);};
 function mode(m){S.mode=m;document.body.classList.toggle('manual',m==='box');$('select').classList.toggle('primary',m==='box');$('clickmode').classList.toggle('primary',m==='click');msg(m==='box'?'拖动框选一行，松开后自动识别原文。':'点击图片上的文字框，自动带入原文与样式。');}
@@ -92,12 +110,17 @@ async function generate(){
  ctx.drawImage(ink,r.x+n.x-area.x,r.y+n.y-area.y);return {patch:c,r:area};
 }
 async function apply(){const v=await generate();S.history.push({r:{...v.r},data:base.getContext('2d').getImageData(v.r.x,v.r.y,v.r.w,v.r.h)});while(S.history.length>10||S.history.length>1&&S.history.reduce((n,h)=>n+h.data.data.byteLength,0)>64000000)S.history.shift();const ctx=base.getContext('2d');ctx.clearRect(v.r.x,v.r.y,v.r.w,v.r.h);ctx.drawImage(v.patch,v.r.x,v.r.y);markChanged();clearSelection();msg('已应用。继续修改请重新识别，或框选下一行。');}
-function clearSelection(){Object.assign(S,{lines:[],source:null,r:null,a:null,match:null,preview:null});list();paint();}
-$('upload').onclick=$('start').onclick=()=>$('file').click();$('file').onchange=()=>{const f=$('file').files[0];$('file').value='';run(()=>load(f));};$('detect').onclick=()=>run(detect);$('select').onclick=()=>mode('box');$('clickmode').onclick=()=>mode('click');$('estimate').onclick=()=>run(match);async function livePreview(){if(!S.source||S.busy)return;try{S.preview=await generate();paint();}catch(e){}}
+function clearSelection(){Object.assign(S,{lines:[],source:null,r:null,a:null,match:null,preview:null});inlineEditor.hidden=true;list();paint();}
+$('upload').onclick=$('start').onclick=()=>$('file').click();$('file').onchange=()=>{const f=$('file').files[0];$('file').value='';run(()=>load(f));};$('detect').onclick=()=>run(detect);$('select').onclick=()=>mode('box');$('clickmode').onclick=()=>mode('click');$('estimate').onclick=()=>run(match);async function livePreview(){if(!S.source||S.busy)return;try{S.preview=await generate();paint();$('previewMeta').textContent='实时预览已更新';}catch(e){S.preview=null;paint();$('previewMeta').textContent='预览失败';msg(e.message,true);}}
 $('preview').onclick=()=>run(async()=>{await livePreview();msg('实时预览已生成，修改参数会自动同步。');});
 $('language').addEventListener('change',()=>{S.detectedLang=$('language').value==='auto'?null:$('language').value;$('langhint').textContent=$('language').value==='auto'?'默认会智能识别语种；识别不准时可手动切换后重新识别。':`当前语言：${langLabel($('language').value)}。切换后请重新识别图片或选区。`;});
+
+function syncInlineEditorFromForm(){if(document.activeElement!==inlineEditor)inlineEditor.value=$('text').value;updateInlineEditor();}
+inlineEditor.addEventListener('input',()=>{if($('text').value!==inlineEditor.value){$('text').value=inlineEditor.value;$('text').dispatchEvent(new Event('input',{bubbles:true}));}});
+inlineEditor.addEventListener('focus',()=>{inlineEditor.select?.();});
+
 ['text','font','size','weight','spacing','leading','stroke','blur','angle','opacity','color','bgcolor','dx','dy'].forEach(id=>{
- const el=$(id); if(el) el.addEventListener('input',()=>{clearTimeout(window.__pv);window.__pv=setTimeout(livePreview,180);});
+ const el=$(id); if(el) el.addEventListener('input',()=>{syncInlineEditorFromForm();clearTimeout(window.__pv);window.__pv=setTimeout(livePreview,180);});
 });$('form').onsubmit=e=>{e.preventDefault();run(apply);};
 $('undo').onclick=()=>{const h=S.history.pop();if(!h)return;base.getContext('2d').putImageData(h.data,h.r.x,h.r.y);clearSelection();lock(false);msg('已撤销，请重新识别或框选。');};$('export').onclick=()=>{if(S.preview)return msg('请先应用预览再导出',true);base.toBlob(blob=>{const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='text-studio-result.png';a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);},'image/png');};
 $('zoom').onchange=resize;$('fit').onclick=()=>{$('zoom').value='fit';resize();};window.addEventListener('resize',resize);$('original').onpointerdown=e=>{e.preventDefault();$('original').setPointerCapture(e.pointerId);paint(true);};for(const t of ['pointerup','pointercancel','lostpointercapture'])$('original').addEventListener(t,()=>paint());

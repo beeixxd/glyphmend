@@ -21,3 +21,9 @@
 #viewport.dragging{cursor:grabbing}
 #viewport.dragging *{cursor:grabbing!important;user-select:none}
 @media(max-width:1100px){#compareStage{flex-direction:column;min-width:auto;width:100%}.view-panel{width:max-content;max-width:100%}}
+
+#originalPane,#previewPane{position:relative}
+#inlineEditor{position:absolute;z-index:6;resize:none;overflow:hidden;border:1px dashed #9a8dff;background:rgba(17,18,23,.72);color:#f3f1ff;padding:4px 6px;outline:none;box-shadow:0 0 0 1px rgba(154,141,255,.25) inset}
+#inlineEditor:focus{border-color:#c5b8fa;box-shadow:0 0 0 2px rgba(154,141,255,.35)}
+#originalPane #boxes{position:absolute;inset:0;width:100%;height:100%;overflow:visible;z-index:5}
+#previewPane canvas{position:relative;z-index:1}
