@@ -1,0 +1,10 @@
+<!doctype html><meta charset=utf-8><body><script type=module>
+import { cv } from '../js/util.js';
+import { fonts } from '../js/fonts.js';
+import { extractMask, strokeWidth, rowBands } from '../js/analyze.js';
+import { fitStyle, styleFromFit } from '../js/fit.js';
+import { DEFAULT_STYLE, renderInk, buildPatch } from '../js/render.js';
+window.T = { cv, fonts, extractMask, strokeWidth, rowBands, fitStyle, styleFromFit, DEFAULT_STYLE, renderInk, buildPatch };
+fonts.detectSystem();
+window.T.ready = true;
+</script>

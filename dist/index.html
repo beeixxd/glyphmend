@@ -1,13 +1,207 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>字境 · 图片文字工作室</title><link rel="stylesheet" href="style.css"><style>
-#boxes rect{fill:#9682ff10;stroke:#9277ef;stroke-width:1.3;vector-effect:non-scaling-stroke;cursor:pointer}#boxes .selection{stroke:#cfbfff;fill:none;stroke-width:2;pointer-events:none}.manual #boxes rect{pointer-events:none}#candidates button{display:block;width:100%;margin-top:6px;text-align:left;font-size:11px}#comparison{width:100%;height:auto;background:#111;max-height:180px;object-fit:contain;border:1px solid #444;margin-top:10px}.layers>button{margin:5px 0;width:100%}.editor button{margin-top:9px}.tag{letter-spacing:0}.quality{border:1px solid #484056;padding:10px;border-radius:8px;color:#bfb7e3;font-size:11px}input[readonly]{color:#aaa}#fontfile{display:none}
-</style></head><body>
-<header><div class="brand"><b class="logo">字</b><div><strong>字境</strong><small>LOCAL TEXT STUDIO / V4</small></div><span class="tag">免费 OCR · 图片在浏览器内处理</span></div><div class="actions"><details id="filemenu" class="file-menu"><summary>文件</summary><div><button id="menunew">新建画布…</button><button id="menuopen">打开文件…</button><button id="menuexport">导出 PNG</button><button id="menuphotopea">在线 Photopea…</button><button id="menuclose">关闭当前标签页…</button></div></details><button id="newdocument">新建</button><button id="upload">打开图片</button><button id="demo">体验示例</button><button id="export" class="primary" disabled>导出 PNG</button></div><input id="file" hidden type="file" accept="image/png,image/jpeg,image/webp,image/bmp"><input id="fontfile" hidden multiple type="file" accept=".ttf,.otf,.woff,.woff2"></header>
-<nav id="documenttabs" class="document-tabs" role="tablist" aria-label="打开的图片"></nav><main><aside class="layers"><div class="eyebrow">01 / 自动识别与选择</div><h2>点选或框选文字</h2><p>打开图片自动识别。点选文字行，或拖动框选一行，原文会自动填入。</p><label>识别语言<select id="language"><option value="auto">自动识别语种</option><option value="eng+chi_sim">简体中文</option><option value="eng+chi_tra">繁体中文</option><option value="eng">英文 / 数字</option><option value="eng+jpn">日语</option><option value="eng+kor">韩语</option><option value="eng+spa">西班牙语</option><option value="eng+por">葡萄牙语</option><option value="eng+fra">法语</option><option value="eng+deu">德语</option><option value="eng+ita">意大利语</option><option value="eng+vie">越南语</option><option value="eng+rus">俄语</option><option value="eng+tha">泰语</option></select></label><p class="note" id="langhint">默认会智能识别语种；识别不准时可手动切换后重新识别。</p><label>OCR 模式<select id="ocrprovider"><option value="local">本地免费 OCR · 图片不上传</option><option value="online">联网接口 · 图片将上传到填写地址</option></select></label><label>已授权 OCR 接口 URL<input id="ocrendpoint" type="url" placeholder="http://127.0.0.1:端口/ocr"></label><p class="note">未内置公共免费 API 或密钥。联网需要配置接口与跨域许可；默认本地后台识别。</p><button id="detect" disabled>重新识别整张图片</button><button id="clickmode" class="primary" disabled>鼠标点击模式</button><button id="select" disabled>框选模式 · 自动识别</button><label>框选识别模式<select id="ocrmode"><option value="6">段落 / 多行</option><option value="7">单行文字</option></select></label><button id="manualtext">添加文字</button><button id="photopea">在线 Photopea</button><div id="blocks">识别后显示文字行</div><div class="side-note"><b>无需输入原内容</b><p>原文由 OCR 自动提取；低清、艺术字、倾斜文字会影响识别和匹配。</p><b>本地处理</b><p>首次联网下载免费 OCR 引擎与语言模型，不发送图片到识别服务。安装本地依赖后可离线运行。</p></div></aside>
-<section class="workspace"><div class="toolbar"><span id="info">左侧原图 · 右侧实时预览 · 原尺寸编辑</span><div class="tools"><button id="redo" type="button">恢复</button><button id="undo" disabled>撤销</button><button id="original" disabled>按住看原图</button><button id="fit">适合窗口</button><select id="zoom" aria-label="画布缩放"><option value="fit">适合窗口</option><option value="0.5">50%</option><option value="1">100%</option><option value="2">200%</option><option value="5">500%</option><option value="10">1000% · 10 倍</option></select></div></div><div id="viewport"><div id="welcome"><div class="hero-glyph">Aa<span>字</span></div><div class="eyebrow">原图对比 · 实时预览 · 精细编辑</div><h1>图片文字编辑工作台。<br>识别、替换、实时预览。</h1><p>选择图片文字区域，即可编辑并实时查看效果。</p><button id="start" class="primary">打开图片</button><small>PNG / JPG / WebP / BMP · 25 MB / 1600 万像素</small></div><div id="stage" hidden><div id="compareStage"><section class="view-panel"><div class="view-head"><strong>原图</strong><span id="originalMeta">等待导入图片</span></div><div id="originalPane" class="canvas-pane"><canvas id="originalView"></canvas><svg id="boxes" xmlns="http://www.w3.org/2000/svg"></svg><textarea id="inlineEditor" hidden spellcheck="false"></textarea></div></section><section class="view-panel"><div class="view-head"><strong>实时预览</strong><span id="previewMeta">等待导入图片</span></div><div id="previewPane" class="canvas-pane"><canvas id="image"></canvas></div></section></div></div></div><footer><span id="status" role="status" aria-live="polite">打开图片或粘贴截图开始</span><span>原尺寸 PNG</span></footer></section>
-<aside class="editor"><div class="eyebrow">02 / 匹配与编辑</div><h2>保留文字样式</h2><button id="localfonts">读取本机全部字体</button><button id="addfont">批量导入 TTF / OTF / WOFF</button><button id="onlinefonts">联网加载免费思源系中文字体</button><details class="font-library"><summary>免费在线字体库</summary><label>字体名称<input id="fontname" list="fontnames" placeholder="例如 Noto Sans SC / Inter"></label><datalist id="fontnames"></datalist><button id="loadnamedfont">加载所选免费字体</button><button id="syncfonts">同步 Google Fonts 全目录</button><p id="fontcataloguestatus" class="note"></p><p class="note">字体按需下载。免费目录不包含所有商用 / 定制字体，缺少原字体时可以批量导入。</p></details><p class="note">读取本机字体需桌面 Chrome / Edge，浏览器会询问字体权限；不是内置全球所有字体。</p>
-<form id="form"><fieldset id="controls" disabled><label>原内容 · 自动识别<textarea id="old" readonly rows="2" placeholder="选择文字后自动填入"></textarea></label><label>替换内容<textarea id="text" rows="2" placeholder="输入新内容，可换行"></textarea></label><label>行距 / 原图 px<input id="leading" type="number" min="1" max="2000" step="0.01" value="30"></label><label>绘制方式<select id="render"><option value="auto">字体重绘 · 未改原文时保留原像素</option><option value="glyph">复用原字形 · 仅支持原行已有字符</option></select></label><button id="estimate" type="button">重新匹配字体与字号</button><p id="matchnote" class="note">字体匹配结果可在预览中查看。</p><div id="candidates"></div><canvas id="comparison" width="1" height="1"></canvas><p class="note">实时预览会同步显示修改效果。</p><label>字体<select id="font"></select></label><div class="row"><label>字号 · 锁定<input id="size" type="number" min="0.01" max="1000" step="0.01" value="24"></label><label>字重<select id="weight"><option value="400">常规 400</option><option value="300">细体 300</option><option value="500">中等 500</option><option value="600">半粗 600</option><option value="700">粗体 700</option><option value="800">特粗 800</option></select></label></div><div class="row"><label>字距 / px<input id="spacing" type="number" step="0.01" value="0"></label><label>文字颜色<input id="color" type="color" value="#222222"></label></div><div class="row"><label>描边 / px<input id="stroke" type="number" min="0" max="10" step="0.1" value="0"></label><label>柔化 / px<input id="blur" type="number" min="0" max="5" step="0.1" value="0"></label></div><div class="row"><label>角度 / °<input id="angle" type="number" min="-180" max="180" step="0.1" value="0"></label><label>不透明度<input id="opacity" type="number" min="0" max="1" step="0.01" value="1"></label></div><div class="quality"><b>Alt + 方向键：每按一次移动 1 原图像素</b><p>支持上下左右；长按可连续移动，每次仍为 1 原图像素；也可直接拖动选中文字。移动后点击应用保存位置。</p><div class="row"><label>文字偏移 X / px<input id="offsetx" type="number" value="0" readonly></label><label>文字偏移 Y / px<input id="offsety" type="number" value="0" readonly></label></div><button id="resetoffset" type="button">位置归零</button></div><div class="divider"></div><label>背景修复<select id="repair"><option value="diffuse">边缘补全 · 纯色 / 平滑渐变</option><option value="solid">指定纯色覆盖</option><option value="clone">复制附近背景</option><option value="keep">保留背景 · 直接叠字</option></select></label><label>背景颜色<input id="bgcolor" type="color" value="#ffffff"></label><div class="row"><label>复制偏移 X<input id="dx" type="number" value="0"></label><label>复制偏移 Y<input id="dy" type="number" value="-60"></label></div><details><summary>调整选区与重新识别</summary><div class="row"><label>X<input id="x" type="number"></label><label>Y<input id="y" type="number"></label></div><div class="row"><label>宽<input id="w" type="number" min="3"></label><label>高<input id="h" type="number" min="3"></label></div><button id="recognizebox" type="button">识别当前坐标区域</button></details><button id="preview" type="button" class="apply">预览修改</button><button type="submit" class="primary apply">应用修改</button></fieldset></form><p class="quality">字体库不能保证任意图片 100% 匹配。新字符需要对应字体；复杂背景、阴影、压缩噪点会影响还原。10 倍缩放用于检查。</p></aside></main><dialog id="newdialog"><form id="newform"><h2>新建画布</h2><label>名称<input id="newname" value="未命名"></label><div class="row"><label>宽度 / px<input id="newwidth" type="number" min="3" max="16000" value="1200" required></label><label>高度 / px<input id="newheight" type="number" min="3" max="16000" value="800" required></label></div><label>背景颜色<input id="newbackground" type="color" value="#ffffff"></label><label class="check"><input id="newtransparent" type="checkbox">透明背景</label><p class="note">不超过 1600 万像素；新建画布独立打开在标签页。</p><div class="actions"><button id="newcancel" type="button">取消</button><button type="submit" class="primary">新建</button></div></form></dialog>
-<dialog id="psdialog"><div class="ps-toolbar"><div><strong>Photopea · <span id="pslabel"></span></strong><small>免费在线编辑器，需要联网；图片与所选字体交由 Photopea 网页处理。</small></div><div class="actions"><button id="psreturn" class="primary">返回本站（带回修改）</button><button id="pspng">导出 PNG</button><button id="pspsd">导出 PSD</button><button id="psleave">暂时切回本站</button></div></div><div class="ps-options"><label class="check"><input id="pseditable" type="checkbox">重建可编辑文字层（有选中文字时，需核对字体）</label><button id="pssend">重新发送当前图</button><button id="psfonts">发送所选字体</button><button id="psreload">重新加载…</button><span id="pssuggestion"></span></div><div id="psstatus" role="status" aria-live="polite">正在加载…</div><iframe id="psframe" title="Photopea 免费在线图像编辑器" allow="clipboard-read; clipboard-write; fullscreen"></iframe></dialog>
-<script src="repair.js"></script><script src="layout.js"></script><script src="studio.js"></script><script src="workspace.js"></script><script src="fonts.js"></script><script src="photopea.js"></script><script src="glyphs.js"></script><script src="engine-v51.js"></script>
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>字境 · 图片文字工作室 V6</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand"><b class="logo">字</b><div><strong>字境</strong><small>TEXT STUDIO · V6</small></div><span class="chip">本地多模型识别 · 原图/预览实时对比</span></div>
+  <div class="actions">
+    <details id="filemenu" class="menu"><summary>文件</summary>
+      <div class="menu-pop">
+        <button id="mNew">新建画布…</button><button id="mOpen">打开图片…</button><hr>
+        <button id="mPng">导出 PNG</button><button id="mJpg">导出 JPG</button><button id="mWebp">导出 WebP</button><button id="mCopy">复制到剪贴板</button><hr>
+        <button id="mFlatten">合并图层（烘焙为新底图）</button><button id="mPhotopea">在线 Photopea…</button><hr>
+        <button id="mClose">关闭当前标签页…</button>
+      </div>
+    </details>
+    <button id="btnOpen">打开图片</button>
+    <button id="btnDemo">体验示例</button>
+    <button id="btnUndo" title="Ctrl+Z" disabled>撤销</button>
+    <button id="btnRedo" title="Ctrl+Shift+Z" disabled>恢复</button>
+    <button id="btnExport" class="primary" disabled>导出 PNG</button>
+  </div>
+  <input id="fileInput" type="file" hidden multiple accept="image/png,image/jpeg,image/webp,image/bmp,image/gif">
+  <input id="fontInput" type="file" hidden multiple accept=".ttf,.otf,.woff,.woff2">
+</header>
+<nav id="tabs" class="tabs" role="tablist" aria-label="打开的图片"></nav>
 
-</body></html>
+<main>
+  <aside id="left" class="panel">
+    <section>
+      <h3>01 · 识别引擎</h3>
+      <label class="chk"><input type="checkbox" id="engPaddle" checked><span>PaddleOCR PP-OCRv4<em>本地 · 离线 · 中文强</em></span></label>
+      <label class="chk"><input type="checkbox" id="engTess" checked><span>Tesseract<em>本地 · 离线 · 拉丁/数字强</em></span></label>
+      <label class="chk"><input type="checkbox" id="engLLM"><span>视觉大模型校对<em>可选 · 需配置接口</em></span></label>
+      <div class="row"><button id="btnLLMCfg" type="button">配置视觉模型…</button><button id="btnOCR" type="button" disabled>重新识别整图</button></div>
+      <label>Tesseract 语言
+        <select id="lang">
+          <option value="auto">自动（简中 + 英文）</option><option value="eng+chi_sim">简体中文 + 英文</option><option value="eng+chi_tra">繁体中文 + 英文</option><option value="eng">仅英文 / 数字</option>
+          <option value="eng+jpn">日语 + 英文</option><option value="eng+kor">韩语 + 英文</option><option value="eng+fra">法语</option><option value="eng+deu">德语</option><option value="eng+spa">西班牙语</option><option value="eng+rus">俄语</option>
+        </select>
+      </label>
+      <p class="note" id="ocrNote">多个引擎结果会按位置合并、投票，分歧行可点候选切换。</p>
+    </section>
+    <section>
+      <h3>02 · 选择文字</h3>
+      <div class="seg">
+        <button id="modeClick" class="on" type="button">点选</button><button id="modeBox" type="button">框选</button><button id="btnAddText" type="button">添加文字</button>
+      </div>
+      <label>框选识别<select id="boxMode"><option value="block">段落 / 多行</option><option value="line">单行文字</option></select></label>
+      <button id="btnBatch" type="button" disabled>批量查找替换…</button>
+    </section>
+    <section>
+      <h3>文字行 <span id="lineCount" class="count"></span></h3>
+      <div id="lines" class="list"><p class="note">打开图片后自动识别。</p></div>
+    </section>
+    <section>
+      <h3>编辑图层 <span id="layerCount" class="count"></span></h3>
+      <div id="layerList" class="list"><p class="note">修改文字后在此出现；可隐藏或删除。</p></div>
+    </section>
+  </aside>
 
+  <section id="center" class="center">
+    <div class="toolbar">
+      <span id="info" class="info">左：原图 · 右：实时预览</span>
+      <div class="tools">
+        <div class="seg small" id="layoutSeg" role="group" aria-label="对比方式">
+          <button data-layout="lr" class="on" type="button" title="左右对比">左右</button>
+          <button data-layout="tb" type="button" title="上下对比">上下</button>
+          <button data-layout="swipe" type="button" title="滑动对比">滑动</button>
+          <button data-layout="diff" type="button" title="差异热力图">差异</button>
+          <button data-layout="prev" type="button" title="仅预览">仅预览</button>
+        </div>
+        <select id="zoom" aria-label="缩放"><option value="fit">适合窗口</option><option value="0.5">50%</option><option value="1">100%</option><option value="2">200%</option><option value="4">400%</option><option value="8">800%</option><option value="16">1600%</option></select>
+        <label class="chk inline"><input type="checkbox" id="chkBoxes" checked><span>文字框</span></label>
+      </div>
+    </div>
+    <div id="viewport" class="viewport">
+      <div id="welcome" class="welcome">
+        <div class="hero">Aa<span>字</span></div>
+        <h1>图片文字编辑工作台</h1>
+        <p>选中文字 → 自动匹配字体 / 字号 / <b>字重</b> → 输入新文字，<b>预览实时跟随</b>，原图始终并排对照。</p>
+        <button id="btnStart" class="primary">打开图片</button>
+        <small>PNG / JPG / WebP / BMP / GIF · 单张最大 25 MB、1600 万像素 · 也可拖入或 Ctrl+V 粘贴</small>
+      </div>
+      <div id="compare" class="compare lr" hidden>
+        <section class="pane-wrap" id="wrapOrig"><div class="pane-head"><strong>原图</strong><span id="origMeta"></span></div>
+          <div class="pane" id="paneOrig"><canvas id="cvOrig"></canvas><svg id="svgOrig" xmlns="http://www.w3.org/2000/svg"></svg><div class="xhair" id="xhOrig"></div></div></section>
+        <section class="pane-wrap" id="wrapPrev"><div class="pane-head"><strong id="prevTitle">实时预览</strong><span id="prevMeta"></span></div>
+          <div class="pane" id="panePrev"><canvas id="cvPrev"></canvas><svg id="svgPrev" xmlns="http://www.w3.org/2000/svg"></svg><div class="xhair" id="xhPrev"></div><div class="swipe-handle" id="swipeHandle" hidden></div></div></section>
+      </div>
+    </div>
+    <footer><span id="status" role="status" aria-live="polite">打开图片或粘贴截图开始</span><span id="busy" class="busy" hidden></span><span class="foot-right" id="footRight">Alt + 方向键：每次 1 像素微移</span></footer>
+  </section>
+
+  <aside id="right" class="panel">
+    <fieldset id="form" disabled>
+      <section>
+        <h3>03 · 文字内容</h3>
+        <label>原文 <small>（可更正 OCR 错误）</small><textarea id="srcText" rows="2" spellcheck="false" placeholder="选择文字后自动填入"></textarea></label>
+        <label>新文字 <small>（实时预览）</small><textarea id="newText" rows="3" spellcheck="false" placeholder="输入新内容，可换行"></textarea></label>
+        <div id="alts" class="chips"></div>
+      </section>
+      <section>
+        <h3>04 · 字体匹配</h3>
+        <div class="row"><button id="btnFit" type="button" class="primary">重新匹配 字体 / 字号 / 字重</button></div>
+        <div id="cands" class="chips"></div>
+        <p id="fitNote" class="note">选中文字后自动匹配；候选可点击切换。</p>
+        <canvas id="cmpCanvas" class="cmp" width="1" height="1" title="青色=原图文字，粉色=重绘文字，重合处发白"></canvas>
+        <label>字体<select id="font"></select></label>
+        <div class="row3">
+          <label>字号<input id="size" type="number" min="1" max="1000" step="0.1"></label>
+          <label>字重<input id="weight" type="number" min="100" max="900" step="50"></label>
+          <label title="连续字重微调：+变粗 / −变细（像素），与原图笔画粗细对齐">字重微调<input id="embolden" type="number" min="-8" max="12" step="0.05"></label>
+        </div>
+        <div class="row3">
+          <label>字距<input id="spacing" type="number" step="0.05"></label>
+          <label>行距<input id="leading" type="number" min="0" step="0.1" title="0 = 自动 1.2 倍"></label>
+          <label>倾斜°<input id="skew" type="number" min="-45" max="45" step="0.5"></label>
+        </div>
+        <div class="row3">
+          <label>对齐<select id="align"><option value="left">左</option><option value="center">中</option><option value="right">右</option></select></label>
+          <label>柔化 px<input id="blur" type="number" min="0" max="8" step="0.1"></label>
+          <label class="chk inline"><input id="italic" type="checkbox"><span>字体斜体</span></label>
+        </div>
+      </section>
+      <section>
+        <h3>05 · 外观</h3>
+        <div class="row3">
+          <label>文字色<input id="color" type="color"></label>
+          <label>描边 px<input id="stroke" type="number" min="0" max="20" step="0.1"></label>
+          <label>描边色<input id="strokeColor" type="color"></label>
+        </div>
+        <div class="row3">
+          <label>不透明度<input id="opacity" type="number" min="0" max="1" step="0.05"></label>
+          <label>角度°<input id="angle" type="number" min="-180" max="180" step="0.1"></label>
+          <span></span>
+        </div>
+        <label class="chk inline"><input id="shadowOn" type="checkbox"><span>投影</span></label>
+        <div class="row4">
+          <label>X<input id="shadowX" type="number" step="1"></label><label>Y<input id="shadowY" type="number" step="1"></label>
+          <label>模糊<input id="shadowBlur" type="number" min="0" step="1"></label><label>色<input id="shadowColor" type="color"></label>
+        </div>
+      </section>
+      <section>
+        <h3>06 · 绘制方式与背景</h3>
+        <label>绘制方式
+          <select id="mode"><option value="font">字体重绘（任意新文字）</option><option value="hybrid">智能混合（有原字形复用，缺字补画）</option><option value="glyph">仅复用原字形（缺字报错）</option></select>
+        </label>
+        <label>背景修复
+          <select id="repair"><option value="smooth">智能修补文字像素（保留背景纹理）</option><option value="rect">矩形平滑（纯色 / 渐变）</option><option value="solid">指定纯色覆盖</option><option value="clone">复制附近背景</option><option value="keep">保留背景 · 直接叠字</option></select>
+        </label>
+        <div class="row3"><label>纯色<input id="bgcolor" type="color"></label><label>复制 X<input id="dx" type="number" step="1"></label><label>复制 Y<input id="dy" type="number" step="1"></label></div>
+        <label class="chk inline"><input id="wrap" type="checkbox"><span>到图片边缘自动换行</span></label>
+      </section>
+      <section>
+        <h3>07 · 位置</h3>
+        <div class="row3"><label>偏移 X<input id="offX" type="number" readonly></label><label>偏移 Y<input id="offY" type="number" readonly></label><label>&nbsp;<button id="btnResetPos" type="button">归零</button></label></div>
+        <p class="note">拖动预览中的文字框，或 Alt+方向键（每次 1 原图像素）。</p>
+        <div class="row"><button id="btnRevert" type="button">还原此行</button><button id="btnDelete" type="button" class="danger">删除图层</button></div>
+      </section>
+    </fieldset>
+    <details class="fontbox">
+      <summary>字体来源（本机 / 导入 / 免费在线）</summary>
+      <button id="fLocal" type="button">读取本机全部字体</button>
+      <button id="fImport" type="button">批量导入 TTF / OTF / WOFF</button>
+      <button id="fZh" type="button">联网加载免费思源中文字体</button>
+      <label>在线免费字体名<input id="fName" list="fNames" placeholder="例如 Noto Sans SC / Inter"></label><datalist id="fNames"></datalist>
+      <div class="row"><button id="fLoad" type="button">加载</button><button id="fSync" type="button">同步 Google Fonts 目录</button></div>
+      <p id="fStatus" class="note"></p>
+    </details>
+  </aside>
+</main>
+
+<dialog id="dlgNew"><form id="frmNew" method="dialog"><h2>新建画布</h2>
+  <label>名称<input id="newName" value="未命名"></label>
+  <div class="row"><label>宽 px<input id="newW" type="number" min="3" max="16000" value="1200" required></label><label>高 px<input id="newH" type="number" min="3" max="16000" value="800" required></label></div>
+  <label>背景色<input id="newBg" type="color" value="#ffffff"></label><label class="chk inline"><input id="newTransparent" type="checkbox"><span>透明背景</span></label>
+  <div class="row end"><button type="button" id="newCancel">取消</button><button class="primary" type="submit">新建</button></div></form></dialog>
+
+<dialog id="dlgBatch"><form id="frmBatch" method="dialog"><h2>批量查找替换</h2>
+  <p class="note">在所有已识别文字行中查找并替换；每条命中行会自动匹配字体并生成图层，可一次撤销。</p>
+  <label>查找<input id="bFind" required></label><label>替换为<input id="bRepl"></label>
+  <div class="row"><label class="chk inline"><input type="checkbox" id="bCase"><span>区分大小写</span></label><label class="chk inline"><input type="checkbox" id="bRegex"><span>正则表达式</span></label></div>
+  <p id="bPreview" class="note"></p>
+  <div class="row end"><button type="button" id="bCancel">取消</button><button class="primary" type="submit" id="bGo">全部替换</button></div></form></dialog>
+
+<dialog id="dlgLLM"><form id="frmLLM" method="dialog"><h2>视觉大模型（可选）</h2>
+  <p class="note">只用于“校对文字 + 提示粗体/斜体/字体族”。文字坐标仍来自本地 OCR。图片会由你的浏览器<b>直接</b>发送到下面填写的服务商（本站无中转）；部分免费档可能将数据用于改进模型，涉及隐私请使用本机 Ollama / LM Studio。</p>
+  <label>服务商<select id="llmPreset"></select></label>
+  <label>接口地址<input id="llmBase" placeholder="https://…"></label>
+  <label>模型名<input id="llmModel" placeholder="以服务商当前可用模型为准"></label>
+  <label>API Key<input id="llmKey" type="password" autocomplete="off" placeholder="本机类可留空"></label>
+  <label class="chk inline"><input id="llmRemember" type="checkbox"><span>记住 Key（仅保存在本机浏览器 localStorage）</span></label>
+  <p id="llmNote" class="note"></p>
+  <div class="row end"><button type="button" id="llmTest">测试连接</button><button type="button" id="llmCancel">取消</button><button class="primary" type="submit">保存并启用</button></div></form></dialog>
+
+<dialog id="dlgPP"><div class="pp-bar"><div><strong>Photopea · <span id="ppLabel"></span></strong><small>免费在线编辑器，需联网；图片与所选字体会交给 Photopea 网页处理。</small></div>
+  <div class="actions"><button id="ppReturn" class="primary">返回本站（带回修改）</button><button id="ppPng">导出 PNG</button><button id="ppPsd">导出 PSD</button><button id="ppSend">重新发送当前图</button><button id="ppFonts">发送所选字体</button><button id="ppLeave">暂时切回</button></div></div>
+  <div id="ppStatus" role="status" class="pp-status">正在加载…</div><iframe id="ppFrame" title="Photopea" allow="clipboard-read; clipboard-write; fullscreen"></iframe></dialog>
+
+<script type="module" src="js/app.js"></script>
+</body>
+</html>

@@ -1,14 +1,15 @@
 {
   "name": "text-studio-free-web",
-  "version": "5.1.1",
+  "version": "6.0.0",
   "private": true,
+  "description": "字境 · 图片文字工作室：本地多模型识别、字体/字重自动匹配、原图与预览实时对比",
   "scripts": {
     "start": "node server.cjs",
-    "test": "node test-all.cjs && node test-v51.cjs",
-    "test:browser": "node test-v51-browser.cjs",
-    "test:glyph": "node test-glyph-browser.cjs"
+    "test": "node tests/run-all.cjs",
+    "test:unit": "node tests/unit-analyze.mjs && node tests/unit-layout.mjs && node tests/unit-repair.cjs && node tests/unit-fusion.mjs"
   },
   "devDependencies": {
-    "playwright": "^1.56.0"
+    "@sparticuz/chromium": "^153.0.0",
+    "puppeteer-core": "^24.0.0"
   }
 }

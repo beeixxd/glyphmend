@@ -1,26 +1,31 @@
-# V4 verification
+# 测试说明（V6）
 
-Passed JS syntax checks for all four application scripts, repair.js and server.cjs.
+运行：`npm install && npm test`。浏览器测试使用 `@sparticuz/chromium`（npm 包内自带的 Chromium，无需另外下载浏览器），均为**真实 Chromium 中的真实 Canvas / Worker / WASM**，不是模拟。
 
-Passed test-workspace.cjs (mock DOM/Canvas): independent canvas/form/OCR/selection/history/preview/zoom state between tabs; close confirmation/cancel; Alt-arrow tap and repeated-key movement; queued movement; original-pixel drag scaling at 10x zoom; locked font size; expanded preview patch; dirty document revision; multiline rendering paths; leading estimates; Photopea message origin/source validation; PNG binary-return routing; rejecting wrong-tab source markers.
+## 已验证
 
-Passed actual TTF naming-table extraction against installed Arial: Arial / ArialMT. This reads a font file's metadata; it does not verify recognizing Arial from an image.
+| 组 | 内容 |
+|---|---|
+| 单元 · 图像分析 | 笔画粗细估计（2–8px，含轻微模糊）、行带切分、倾斜估计、亚像素墨迹框、容错像素距离、纯色/渐变背景下的蒙版提取 |
+| 单元 · 排版 | 中文逐字 / 西文按词 / 避头尾标点 / 超长单词强拆 / emoji 代理对 / 4 万字性能 |
+| 单元 · 背景修复 | 纯色与线性渐变背景恢复误差 ≤ 2、文字之外的像素 100% 不变、800×200 大区域 < 3s |
+| 单元 · 融合与协议 | 多引擎加权投票、空白归一、汉字伪空格清理、视觉模型回包解析（含 Markdown 围栏）、采纳/拒绝幻觉、地址校验 |
+| 浏览器 · 字体/字重拟合 | 9 个合成用例（常规/粗体/衬线/等宽/**字重缺失**/降质/反色/斜体/日文）：字体命中、笔画粗细比值 0.95–1.01 |
+| 浏览器 · 图层与渲染 | 未触碰图层与原图逐像素一致；改字后补丁外像素 0 改动；删字无残影；撤销/恢复；描边+阴影+旋转组合；长文本换行 |
+| 浏览器 · 整站交互 | 文件输入打开 → Paddle+Tesseract 识别 → 点选 → 自动匹配 → **输入文字预览自动变化、原图画布不变** → 字重微调实时生效 → Alt+方向键恰好 1px → 导出与预览**逐像素一致** → 撤销/恢复 → 五种布局 → 1600% 像素网格 → 多标签独立 → 批量替换与一次撤销 → 框选识别 → 添加/删除文字 → 新建画布 → 窗口缩放；全程无 JS 错误 |
+| 浏览器 · 视觉模型链路 | 对**本机 mock 服务**走真实 HTTP：OpenAI 兼容与 Gemini 两种请求格式、拼接图、Key 的位置与落盘策略、429/401/非 JSON 的提示、幻觉拒绝、提示进入字体匹配 |
+| 浏览器 · 字形一致性 | 复用原字形（原文不变）与原图失配率：干净图 0.1%、降质图 1.2%；智能混合未改动部分 0–1%；字体重绘 1.1–1.6% |
 
-Passed classic background repair tests for solid color, gradient continuity, alpha preservation and bounds.
+## 实测数据（沙箱环境，字体仅有 DejaVu / Liberation / IPAGothic 等）
 
-HTTP delivery checked with local server. Chromium launch failed due sandbox IPC access restrictions (mojo platform channel / Crashpad Access Denied). External binary downloads remain blocked in this execution environment. No successful real-browser visual QA, real OCR accuracy check, Google Fonts network download, editable Photopea text-layer creation or live Photopea round trip was completed here. These features are implemented against documented APIs, not declared live-verified.
+- 识别：同一测试图 Tesseract 把“字境”识成“FE”，PaddleOCR 识别正确；融合后三行文字全部正确。
+- 字体匹配：从选区到出结果约 2–5 秒（取决于候选字体数量）。
 
-Official sources:
-- https://www.photopea.com/api/
-- https://www.photopea.com/api/live
-- https://www.photopea.com/api/environment
-- https://www.photopea.com/api/fonts
-- https://www.photopea.com/learn/scripts
-- https://developers.google.com/fonts/docs/getting_started
-- https://github.com/google/fonts
-- https://learn.microsoft.com/en-us/typography/opentype/spec/name
-- https://github.com/naptha/tesseract.js/blob/master/docs/api.md
+## 没有验证、需要你在自己电脑上确认的
 
-The supplied browser test uses a stub OCR response; it is useful for local UI smoke checking after launching a browser with CDP port 9223, but it does not measure real OCR or matching fidelity.
-
-Additional checks passed: supported font-weight filtering; variable weight bounds; compiling editable Photopea text-layer scripts; distinct fallback document markers. Actual installed Arial OS/2 weight parsed as 400. node test-all.cjs runs syntax/reference checks and both suites without child-process launch.
+- **真实的视觉大模型服务**（Gemini / 智谱 / 硅基流动 / OpenRouter / Ollama）：只对 mock 验证了协议与解析；各服务商的真实可用性、免费额度、CORS 与模型名请自行确认。
+- **Photopea**：只验证了对话框、消息来源校验；没有访问外网，未做真实往返。
+- **Google Fonts / GitHub 字体在线加载与目录同步**：沙箱无外网，代码按公开接口实现，未实际下载。
+- **读取本机字体**（`queryLocalFonts`）：无头浏览器不支持，未测。
+- **Windows / macOS 的真实系统字体**（微软雅黑、苹方等）：沙箱没有这些字体，匹配结果以你的电脑为准。
+- 真实世界图片（强压缩、复杂背景、艺术字、透视）没有做统计评测；上表是合成图的结果，**不代表任意图片都能达到同样的一致性**。

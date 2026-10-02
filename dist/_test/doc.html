@@ -1,0 +1,9 @@
+<!doctype html><meta charset=utf-8><body><script type=module>
+import { cv } from '../js/util.js';
+import { fonts } from '../js/fonts.js';
+import { Doc, makeEditLayer, makeAddLayer, fitLayer, renderDoc, applyCandidate } from '../js/doc.js';
+import { DEFAULT_STYLE } from '../js/render.js';
+import { fitStyle } from '../js/fit.js';
+window.T = { cv, fonts, Doc, makeEditLayer, makeAddLayer, fitLayer, renderDoc, DEFAULT_STYLE, applyCandidate, fitStyle };
+fonts.detectSystem(); window.T.ready = true;
+</script>
