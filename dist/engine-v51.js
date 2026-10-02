@@ -5,6 +5,7 @@ function textLayout(p){
  const m=ctx.measureText(p.text||'Mg'),pad=Math.ceil(Math.max(0,p.stroke)+Math.max(0,p.blur)*3+2);
  const ascent=Math.max(p.size*.8,m.actualBoundingBoxAscent||0),descent=Math.max(p.size*.25,m.actualBoundingBoxDescent||0);
  const n=S.nudge||{x:0,y:0},x=S.r.x+n.x+S.a.ink.x,y=S.r.y+n.y+S.a.ink.y;
+ if($('render').value==='glyph')return glyphTextLayout(p,x,y,pad);
  const layout=TextLayout.layout(p.text,{...p,ascent,descent},ch=>ctx.measureText(ch).width,Math.max(1,base.width-x-pad*2));
  return {...layout,ascent,descent,pad,x,y};
 }
@@ -13,7 +14,7 @@ updateInlineEditor=function(){originalInlineUpdate();if(!S.source)return;try{con
 generate=async function(){
  if(!S.source)throw Error('请先选择或添加文字');
  const source=S.source,doc=WORK.active,p=params(),r={...S.r};
- await document.fonts.load(`${p.weight} ${p.size}px "${p.font}"`,p.text);
+ if($('render').value!=='glyph')await document.fonts.load(`${p.weight} ${p.size}px "${p.font}"`,p.text);
  if(source!==S.source||doc!==WORK.active)throw Error('编辑对象已切换，请重试');
  const l=textLayout(p),ink=cv(Math.ceil(l.width+l.pad*2),Math.ceil(l.height+l.pad*2)),ix=ink.getContext('2d');
  if(ink.width*ink.height>16000000)throw Error('文字区域超过安全内存上限，请降低字号或分层编辑');
@@ -22,9 +23,7 @@ generate=async function(){
  for(const [i,line] of l.lines.entries())for(const c of line.chars){
   const x=l.pad+c.x,y=l.pad+l.ascent+i*l.lineHeight;
   if($('render').value==='glyph'){
-   const s=(source.symbols||[]).find(s=>s.text===c.ch);if(c.ch===' ')continue;
-   if(!s)throw Error(`图片这一行没有「${c.ch}」字形，请切换字体重绘`);
-   const b=s.b,g=cv(Math.ceil(b.w+2),Math.ceil(b.h+2)),gc=g.getContext('2d');gc.drawImage(S.a.mask,b.x-r.x-1,b.y-r.y-1,b.w+2,b.h+2,0,0,g.width,g.height);gc.globalCompositeOperation='source-in';gc.fillStyle=p.color;gc.fillRect(0,0,g.width,g.height);ix.drawImage(g,x,y-b.h);
+   drawSourceGlyph(ix,l,p,c.ch,x,l.pad+i*l.lineHeight);
   }else{if(p.stroke>0)ix.strokeText(c.ch,x,y);ix.fillText(c.ch,x,y);}
  }
  const angle=p.angle*Math.PI/180,co=Math.abs(Math.cos(angle)),si=Math.abs(Math.sin(angle));
@@ -66,7 +65,7 @@ function queueOCR(doc){
     const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),30000);let result;
     try{const response=await fetch(url,{method:'POST',body,credentials:'omit',signal:controller.signal});if(!response.ok)throw Error('OCR HTTP '+response.status);result=await response.json();}finally{clearTimeout(timer);}
     if(!Array.isArray(result.lines))throw Error('OCR 响应须包含 lines 数组');
-    lines=result.lines.map(line=>{const r=line.r;if(!r||![r.x,r.y,r.w,r.h].every(Number.isFinite)||r.x<0||r.y<0||r.w<3||r.h<3||r.x+r.w>source.width||r.y+r.h>source.height)throw Error('OCR 坐标无效');return {text:String(line.text||''),r:{...r},symbols:[],confidence:Number(line.confidence)||0,leading:r.h*1.2};});
+    lines=result.lines.map(line=>{const r=line.r;if(!r||![r.x,r.y,r.w,r.h].every(Number.isFinite)||r.x<0||r.y<0||r.w<3||r.h<3||r.x+r.w>source.width||r.y+r.h>source.height)throw Error('OCR 坐标无效');return {text:String(line.text||''),r:{...r},symbols:(Array.isArray(line.symbols)?line.symbols:[]).filter(s=>s&&typeof s.text==='string'&&s.b&&[s.b.x,s.b.y,s.b.w,s.b.h].every(Number.isFinite)&&s.b.x>=r.x&&s.b.y>=r.y&&s.b.w>0&&s.b.h>0&&s.b.x+s.b.w<=r.x+r.w&&s.b.y+s.b.h<=r.y+r.h).map(s=>({text:s.text,b:{...s.b}})),confidence:Number(line.confidence)||0,leading:r.h*1.2};});
    }else{
     const w=await worker(lang);await w.setParameters({tessedit_pageseg_mode:'11',preserve_interword_spaces:'1'});const {data}=await w.recognize(source,{}, {blocks:true});
     // parse depends on active base bounds; postpone applying if the user changed tabs.
